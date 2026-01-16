@@ -24,14 +24,14 @@ jobs:
         pip install -r requirements.txt
 
     - name: Run All Experiments
-      run: |
-        mkdir -p outputs/models
-        mkdir -p outputs/results
+  run: |
+    mkdir -p outputs/models
+    mkdir -p outputs/results
+    for f in experiments/EXP-*.json; do
+      echo "Running experiment $f"
+      python src/train.py "$f"
+    done
 
-        for f in experiments/*.json; do
-          echo "Running experiment $f"
-          python src/train.py "$f"
-        done
 
     - name: Job Summary
       run: |
