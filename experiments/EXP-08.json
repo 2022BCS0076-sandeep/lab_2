@@ -1,0 +1,9 @@
+{
+  "id": "EXP-08",
+  "model": "RandomForest",
+  "hyperparameters": { "n_estimators": 150, "max_depth": 15 },
+  "preprocessing": "None",
+  "feature_selection": "All",
+  "split": 0.25,
+  "stratified": true
+}

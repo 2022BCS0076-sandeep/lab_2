@@ -1,0 +1,68 @@
+[
+  {
+    "id": "EXP-01",
+    "model": "LinearRegression",
+    "hyperparameters": {},
+    "split": 0.20,
+    "preprocessing": "None",
+    "feature_selection": "All"
+  },
+  {
+    "id": "EXP-02",
+    "model": "LinearRegression",
+    "hyperparameters": {},
+    "split": 0.30,
+    "preprocessing": "None",
+    "feature_selection": "All"
+  },
+  {
+    "id": "EXP-03",
+    "model": "LinearRegression",
+    "hyperparameters": {},
+    "split": 0.25,
+    "preprocessing": "None",
+    "feature_selection": "All",
+    "stratified": true
+  },
+  {
+    "id": "EXP-04",
+    "model": "Ridge",
+    "hyperparameters": {"alpha": 1.0},
+    "split": 0.20,
+    "preprocessing": "Standardization",
+    "feature_selection": "Correlation-based"
+  },
+  {
+    "id": "EXP-05",
+    "model": "RandomForest",
+    "hyperparameters": {"n_estimators": 50, "max_depth": 10},
+    "split": 0.20,
+    "preprocessing": "None",
+    "feature_selection": "All"
+  },
+  {
+    "id": "EXP-06",
+    "model": "RandomForest",
+    "hyperparameters": {"n_estimators": 100, "max_depth": 15},
+    "split": 0.20,
+    "preprocessing": "None",
+    "feature_selection": "Importance-based"
+  },
+  {
+    "id": "EXP-07",
+    "model": "RandomForest",
+    "hyperparameters": {"n_estimators": 100, "max_depth": 12},
+    "split": 0.40,
+    "preprocessing": "None",
+    "feature_selection": "All"
+  },
+  {
+    "id": "EXP-08",
+    "model": "RandomForest",
+    "hyperparameters": {"n_estimators": 150, "max_depth": 15},
+    "split": 0.25,
+    "preprocessing": "None",
+    "feature_selection": "All",
+    "stratified": true
+  }
+]

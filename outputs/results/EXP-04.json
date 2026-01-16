@@ -1,0 +1,13 @@
+{
+    "experiment_id": "EXP-04",
+    "model": "Ridge",
+    "hyperparameters": {
+        "alpha": 1.0
+    },
+    "preprocessing": "Standardization",
+    "feature_selection": "Correlation-based",
+    "split": 0.2,
+    "stratified": false,
+    "mse": 0.3900380059146077,
+    "r2_score": 0.4031606598177524
+}

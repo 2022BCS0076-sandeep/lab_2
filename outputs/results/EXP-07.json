@@ -1,0 +1,14 @@
+{
+    "experiment_id": "EXP-07",
+    "model": "RandomForest",
+    "hyperparameters": {
+        "n_estimators": 100,
+        "max_depth": 12
+    },
+    "preprocessing": "None",
+    "feature_selection": "All",
+    "split": 0.4,
+    "stratified": false,
+    "mse": 0.35620490296415985,
+    "r2_score": 0.4522208354610274
+}
