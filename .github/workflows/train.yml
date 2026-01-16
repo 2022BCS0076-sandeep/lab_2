@@ -23,12 +23,15 @@ jobs:
       run: |
         pip install -r requirements.txt
 
-    - name: Run Training Script
-      id: train
+    - name: Run All Experiments
       run: |
-        python src/train.py > metrics_output.txt
-        echo "MSE=$(grep 'MSE:' metrics_output.txt | cut -d ' ' -f2)" >> $GITHUB_OUTPUT
-        echo "R2=$(grep 'R2:' metrics_output.txt | cut -d ' ' -f2)" >> $GITHUB_OUTPUT
+        mkdir -p outputs/models
+        mkdir -p outputs/results
+
+        for f in experiments/*.json; do
+          echo "Running experiment $f"
+          python src/train.py "$f"
+        done
 
     - name: Job Summary
       run: |
@@ -36,13 +39,17 @@ jobs:
         echo "**Name:** Sandeep Chintu" >> $GITHUB_STEP_SUMMARY
         echo "**Roll No:** 2022BCS0076" >> $GITHUB_STEP_SUMMARY
         echo "## 📊 Experiment Metrics" >> $GITHUB_STEP_SUMMARY
-        echo "- MSE: ${{ steps.train.outputs.MSE }}" >> $GITHUB_STEP_SUMMARY
-        echo "- R² Score: ${{ steps.train.outputs.R2 }}" >> $GITHUB_STEP_SUMMARY
+        for file in outputs/results/*.json; do
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`json" >> $GITHUB_STEP_SUMMARY
+          cat "$file" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+        done
 
     - name: Upload Artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: trained-model-and-results
+        name: trained-models-and-results
         path: |
-          outputs/models/model.pkl
-          outputs/results/results.json
+          outputs/models/
+          outputs/results/
