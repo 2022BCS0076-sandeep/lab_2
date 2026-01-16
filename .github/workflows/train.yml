@@ -1,0 +1,46 @@
+name: Train Model
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  build-train:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.10"
+
+    - name: Install Dependencies
+      run: |
+        pip install -r requirements.txt
+
+    - name: Run Training Script
+      id: train
+      run: |
+        python src/train.py > metrics_output.txt
+        echo "MSE=$(grep 'MSE:' metrics_output.txt | cut -d ' ' -f2)" >> $GITHUB_OUTPUT
+        echo "R2=$(grep 'R2:' metrics_output.txt | cut -d ' ' -f2)" >> $GITHUB_OUTPUT
+
+    - name: Job Summary
+      run: |
+        echo "## 🧑 Student Info" >> $GITHUB_STEP_SUMMARY
+        echo "**Name:** Sandeep Chintu" >> $GITHUB_STEP_SUMMARY
+        echo "**Roll No:** 2022BCS0076" >> $GITHUB_STEP_SUMMARY
+        echo "## 📊 Experiment Metrics" >> $GITHUB_STEP_SUMMARY
+        echo "- MSE: ${{ steps.train.outputs.MSE }}" >> $GITHUB_STEP_SUMMARY
+        echo "- R² Score: ${{ steps.train.outputs.R2 }}" >> $GITHUB_STEP_SUMMARY
+
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: trained-model-and-results
+        path: outputs/
