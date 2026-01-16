@@ -1,10 +1,12 @@
 import pandas as pd
 import json
 import os
+import pickle
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error, r2_score
-from joblib import dump
+
+
 
 # Load dataset
 data_path = "data/winequality-red.csv"
@@ -30,9 +32,11 @@ r2 = r2_score(y_test, preds)
 print("MSE:", mse)
 print("R2:", r2)
 
-# Save model
+# Save model as .pkl
 os.makedirs("outputs/models", exist_ok=True)
-dump(model, "outputs/models/model.joblib")
+with open("outputs/models/model.pkl", "wb") as f:
+    pickle.dump(model, f)
+
 
 # Save metrics
 results = {"mse": mse, "r2_score": r2}

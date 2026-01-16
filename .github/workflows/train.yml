@@ -30,7 +30,7 @@ jobs:
         echo "MSE=$(grep 'MSE:' metrics_output.txt | cut -d ' ' -f2)" >> $GITHUB_OUTPUT
         echo "R2=$(grep 'R2:' metrics_output.txt | cut -d ' ' -f2)" >> $GITHUB_OUTPUT
 
-        - name: Job Summary
+    - name: Job Summary
       run: |
         echo "## 🧑 Student Info" >> $GITHUB_STEP_SUMMARY
         echo "**Name:** Sandeep Chintu" >> $GITHUB_STEP_SUMMARY
