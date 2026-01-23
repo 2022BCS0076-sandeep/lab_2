@@ -9,15 +9,15 @@ app = FastAPI(
     version="1.0"
 )
 
-# Load trained model (updated to your repo structure)
-model = joblib.load("outputs/model.pkl")
+# Load trained model (from training pipeline)
+model = joblib.load("output/model.pkl")
 
-# Health check endpoint
+# Health check
 @app.get("/")
 def read_root():
     return {"message": "Wine Quality Prediction API is running"}
 
-# Prediction endpoint with 11 inputs
+# Prediction endpoint
 @app.post("/predict")
 def predict_wine_quality(
     fixed_acidity: float,
@@ -32,8 +32,7 @@ def predict_wine_quality(
     sulphates: float,
     alcohol: float
 ):
-    # Arrange inputs into model format (2D array)
-    features = np.array([[
+    features = np.array([[  
         fixed_acidity,
         volatile_acidity,
         citric_acid,
@@ -47,11 +46,10 @@ def predict_wine_quality(
         alcohol
     ]])
 
-    # Perform prediction
     prediction = model.predict(features)
 
     return {
-        "name": "Sandeep Chintu",
-        "roll_no": "2022BCS0076",
+        "name": "Karri Lakshmi Narasimha Reddy",
+        "roll_no": "2022BCS0028",
         "predicted_wine_quality": int(prediction[0])
     }

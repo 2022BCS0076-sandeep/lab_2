@@ -1,103 +1,125 @@
-name: Train & Deploy Pipeline
+name: ML Train and Deploy Pipeline
 
 on:
   push:
-    branches: ["main"]
+    branches: [ "main" ]
   workflow_dispatch:
 
 jobs:
+  # -----------------------
+  # Job 1: TRAIN (CI)
+  # -----------------------
   train:
-    name: Train Model (CI)
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Setup Python 3.11
+      - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.11"
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
-
-      - name: Run training script
-        run: python src/train.py
-
-      - name: Extract metrics (r2_score)
-        id: metric
         run: |
-          METRIC=$(cat metrics.json | jq -r '.r2_score')
-          echo "metric=$METRIC" >> $GITHUB_OUTPUT
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Run training
+        run: |
+          python train.py
+          # must create metrics.json and model file
+
+      - name: Show metrics
+        run: cat output/metrics.json
+
+      # Save metrics for next job
+      - name: Extract metrics
+        id: metrics
+        run: |
+          echo "MSE=$(jq -r '."Mean Squared Error"' output/metrics.json)" >> $GITHUB_OUTPUT
+          echo "R2=$(jq -r '."R2 Score"' output/metrics.json)" >> $GITHUB_OUTPUT
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: trained-model
+          name: model-artifacts
           path: |
-            outputs/model.pkl
-            metrics.json
+            output/
 
+    outputs:
+      mse: ${{ steps.metrics.outputs.MSE }}
+      r2:  ${{ steps.metrics.outputs.R2 }}
+
+  # -----------------------
+  # Job 2: DEPLOY (CD)
+  # -----------------------
   deploy:
-    name: Deploy Model (CD)
-    runs-on: ubuntu-latest
     needs: train
+    runs-on: ubuntu-latest
 
     steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
-          name: trained-model
-
-      - name: Read new metric (r2_score)
-        id: new
-        run: echo "NEW_METRIC=$(cat metrics.json | jq -r '.r2_score')" >> $GITHUB_ENV
-
-      - name: Read best metric from repo variable
-        id: best
-        run: echo "BEST_METRIC=${{ vars.BEST_METRIC }}" >> $GITHUB_ENV
+          name: model-artifacts
 
       - name: Compare metrics
         id: compare
         run: |
-          echo "NEW: $NEW_METRIC | BEST: $BEST_METRIC"
-          awk -v new="$NEW_METRIC" -v best="$BEST_METRIC" 'BEGIN { exit !(new > best) }'
+          CUR_MSE=${{ needs.train.outputs.mse }}
+          CUR_R2=${{ needs.train.outputs.r2 }}
 
-      - name: No improvement — exit
-        if: failure()
-        run: echo "2022BCS0076 ---- Metric did not improve" && exit 0
+          BEST_MSE=${{ vars.BEST_MSE }}
+          BEST_R2=${{ vars.BEST_R2 }}
 
-      - name: Checkout code for docker build
-        if: success()
-        uses: actions/checkout@v4
+          echo "Current MSE: $CUR_MSE | Best MSE: $BEST_MSE"
+          echo "Current R2: $CUR_R2 | Best R2: $BEST_R2"
 
-      - name: Setup Docker Buildx
-        if: success()
-        uses: docker/setup-buildx-action@v3
+          improve_mse=$(echo "$CUR_MSE < $BEST_MSE" | bc -l)
+          improve_r2=$(echo "$CUR_R2 > $BEST_R2" | bc -l)
 
-      - name: Login to DockerHub
-        if: success()
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          if [ "$improve_mse" -eq 1 ] && [ "$improve_r2" -eq 1 ]; then
+            echo "improved=true" >> $GITHUB_OUTPUT
+          else
+            echo "improved=false" >> $GITHUB_OUTPUT
+          fi
 
-      - name: Build & Push Docker Image
-        if: success()
-        uses: docker/build-push-action@v6
-        with:
-          push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/lab2-model:latest
+      - name: Stop if no improvement
+        if: steps.compare.outputs.improved == 'false'
+        run: |
+          echo "${{ github.actor }} ---- Metric did not improve"
+          exit 0
 
-      - name: Update BEST_METRIC repo variable
-        if: success()
-        uses: actions/github-script@v7
-        with:
-          script: |
-            github.rest.actions.updateRepoVariable({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              name: 'BEST_METRIC',
-              value: process.env.NEW_METRIC
-            })
+      # -------- Docker Build & Push --------
+
+      - name: Login to Docker Hub
+        run: echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+
+      - name: Build Docker image
+        run: |
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/ml-model:latest .
+
+      - name: Push Docker image
+        run: |
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/ml-model:latest
+
+      # -------- Update GitHub Variables --------
+
+      - name: Update BEST_MSE and BEST_R2
+        run: |
+          curl -X PATCH \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${{ secrets.GH_PAT }}" \
+            https://api.github.com/repos/${{ github.repository }}/actions/variables/BEST_MSE \
+            -d '{"name":"BEST_MSE","value":"${{ needs.train.outputs.mse }}"}'
+
+          curl -X PATCH \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${{ secrets.GH_PAT }}" \
+            https://api.github.com/repos/${{ github.repository }}/actions/variables/BEST_R2 \
+            -d '{"name":"BEST_R2","value":"${{ needs.train.outputs.r2 }}"}'
