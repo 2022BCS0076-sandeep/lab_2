@@ -25,10 +25,10 @@ jobs:
       - name: Run training script
         run: python src/train.py
 
-      - name: Extract metrics
+      - name: Extract metrics (r2_score)
         id: metric
         run: |
-          METRIC=$(cat metrics.json | jq -r '.accuracy')
+          METRIC=$(cat metrics.json | jq -r '.r2_score')
           echo "metric=$METRIC" >> $GITHUB_OUTPUT
 
       - name: Upload artifacts
@@ -50,11 +50,11 @@ jobs:
         with:
           name: trained-model
 
-      - name: Read new metric
+      - name: Read new metric (r2_score)
         id: new
-        run: echo "NEW_METRIC=$(cat metrics.json | jq -r '.accuracy')" >> $GITHUB_ENV
+        run: echo "NEW_METRIC=$(cat metrics.json | jq -r '.r2_score')" >> $GITHUB_ENV
 
-      - name: Read best metric
+      - name: Read best metric from repo variable
         id: best
         run: echo "BEST_METRIC=${{ vars.BEST_METRIC }}" >> $GITHUB_ENV
 
@@ -66,7 +66,7 @@ jobs:
 
       - name: No improvement — exit
         if: failure()
-        run: echo "${{ github.actor }} ---- Metric did not improve" && exit 0
+        run: echo "2022BCS0076 ---- Metric did not improve" && exit 0
 
       - name: Checkout code for docker build
         if: success()
@@ -76,7 +76,7 @@ jobs:
         if: success()
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to DockerHub
+      - name: Login to DockerHub
         if: success()
         uses: docker/login-action@v3
         with:
@@ -90,7 +90,7 @@ jobs:
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/lab2-model:latest
 
-      - name: Update BEST_METRIC variable
+      - name: Update BEST_METRIC repo variable
         if: success()
         uses: actions/github-script@v7
         with:
