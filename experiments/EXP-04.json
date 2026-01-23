@@ -1,9 +1,0 @@
-{
-  "id": "EXP-04",
-  "model": "Ridge",
-  "hyperparameters": { "alpha": 1.0 },
-  "preprocessing": "Standardization",
-  "feature_selection": "Correlation-based",
-  "split": 0.2,
-  "stratified": false
-}

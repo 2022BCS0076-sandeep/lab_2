@@ -1,9 +1,0 @@
-{
-  "id": "EXP-02",
-  "model": "LinearRegression",
-  "hyperparameters": {},
-  "preprocessing": "None",
-  "feature_selection": "All",
-  "split": 0.3,
-  "stratified": false
-}
