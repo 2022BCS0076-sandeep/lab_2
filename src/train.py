@@ -1,108 +1,74 @@
-import json
-import pickle
-import pandas as pd
-import sys
 import os
+import json
+import pandas as pd
+import joblib
 
-from sklearn.model_selection import train_test_split, StratifiedShuffleSplit
+from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
-from sklearn.pipeline import make_pipeline
-
-from sklearn.linear_model import LinearRegression, Ridge
+from sklearn.feature_selection import SelectKBest, f_regression
+from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.ensemble import RandomForestRegressor
 
-from sklearn.metrics import mean_squared_error, r2_score
 
-# -----------------------
-# LOAD EXPERIMENT CONFIG
-# -----------------------
-config_path = sys.argv[1]
-config = json.loads(open(config_path).read())
+def main():
+    # 1. Load dataset
+    red_path = "../dataset/wine+quality/winequality-red.csv"
+    white_path = "../dataset/wine+quality/winequality-white.csv"
 
-# -----------------------
-# LOAD DATASET
-# -----------------------
-df = pd.read_csv("data/winequality-red.csv", sep=';')
-X = df.drop("quality", axis=1)
-y = df["quality"]
+    red = pd.read_csv(red_path, sep=";")
+    white = pd.read_csv(white_path, sep=";")
 
-# -----------------------
-# TRAIN/TEST SPLIT
-# -----------------------
-test_size = config["split"]
+    data = pd.concat([red, white], axis=0)
 
-# Stratified or normal split
-if config.get("stratified", False):
-    sss = StratifiedShuffleSplit(n_splits=1, test_size=test_size, random_state=42)
-    for train_index, test_index in sss.split(X, y):
-        X_train, X_test = X.iloc[train_index], X.iloc[test_index]
-        y_train, y_test = y.iloc[train_index], y.iloc[test_index]
-else:
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, random_state=42)
+    # 2. Split features and target
+    X = data.drop("quality", axis=1)
+    y = data["quality"]
 
-# -----------------------
-# MODEL SELECTION
-# -----------------------
-model_name = config["model"]
-hyperparams = config.get("hyperparameters", {})
-preprocessing = config.get("preprocessing", "None")
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=42
+    )
 
-if model_name == "LinearRegression":
-    model = LinearRegression(**hyperparams)
+    # 3. Standardization
+    scaler = StandardScaler()
+    X_train_scaled = scaler.fit_transform(X_train)
+    X_test_scaled = scaler.transform(X_test)
 
-elif model_name == "Ridge":
-    model = Ridge(**hyperparams)
+    # 4. Feature Selection
+    selector = SelectKBest(score_func=f_regression, k=8)
+    X_train_selected = selector.fit_transform(X_train_scaled, y_train)
+    X_test_selected = selector.transform(X_test_scaled)
 
-elif model_name == "RandomForest":
-    model = RandomForestRegressor(**hyperparams, random_state=42)
+    # 5. Train model (Random Forest - 200 trees)
+    model = RandomForestRegressor(
+        n_estimators=200,
+        random_state=42,
+        n_jobs=-1
+    )
+    model.fit(X_train_selected, y_train)
 
-else:
-    raise ValueError(f"Unknown model: {model_name}")
+    # 6. Evaluation
+    y_pred = model.predict(X_test_selected)
+    mse = mean_squared_error(y_test, y_pred)
+    r2 = r2_score(y_test, y_pred)
 
-# -----------------------
-# PIPELINE (if needed)
-# -----------------------
-if preprocessing == "Standardization":
-    model = make_pipeline(StandardScaler(), model)
+    # 7. Save outputs
+    os.makedirs("output", exist_ok=True)
+    joblib.dump(model, "output/model.pkl")
 
-# -----------------------
-# TRAIN & PREDICT
-# -----------------------
-model.fit(X_train, y_train)
-preds = model.predict(X_test)
+    metrics = {
+        "Mean Squared Error": mse,
+        "R2 Score": r2
+    }
 
-# -----------------------
-# METRICS
-# -----------------------
-mse = mean_squared_error(y_test, preds)
-r2 = r2_score(y_test, preds)
+    with open("output/metrics.json", "w") as f:
+        json.dump(metrics, f, indent=4)
 
-# Print cleanly for GitHub Actions summary
-print("Experiment:", config["id"])
-print("Model:", model_name)
-print("MSE:", mse)
-print("R2:", r2)
+    # 8. Print metrics
+    print("Model Evaluation Results")
+    print("------------------------")
+    print(f"MSE: {mse:.4f}")
+    print(f"R² Score: {r2:.4f}")
 
-# -----------------------
-# SAVE OUTPUTS
-# -----------------------
-result = {
-    "experiment_id": config["id"],
-    "model": model_name,
-    "hyperparameters": hyperparams,
-    "preprocessing": preprocessing,
-    "feature_selection": config.get("feature_selection", "None"),
-    "split": test_size,
-    "stratified": config.get("stratified", False),
-    "mse": mse,
-    "r2_score": r2
-}
 
-os.makedirs("outputs/models", exist_ok=True)
-os.makedirs("outputs/results", exist_ok=True)
-
-with open(f"outputs/models/{config['id']}.pkl", "wb") as f:
-    pickle.dump(model, f)
-
-with open(f"outputs/results/{config['id']}.json", "w") as f:
-    json.dump(result, f, indent=4)
+if __name__ == "__main__":
+    main()
