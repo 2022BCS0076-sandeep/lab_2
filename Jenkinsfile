@@ -2,72 +2,179 @@ pipeline {
     agent any
 
     environment {
-        NAME   = "Sandeep"
-        ROLLNO = "2022BCS0076"
-        IMAGE  = "2022bcs0076-ml-model"
+        IMAGE_NAME = "scarxlynx/ml-model:latest"
+        CONTAINER_NAME = "wine_test_container"
+        INTERNAL_PORT = "8000"
     }
 
     stages {
 
-        stage("Checkout Code") {
+        // -----------------------------
+        // Stage 1: Pull Image
+        // -----------------------------
+        stage('Pull Image') {
             steps {
-                checkout scm
+                sh '''
+                echo "Pulling Docker image..."
+                docker pull $IMAGE_NAME
+                '''
             }
         }
 
-        stage("Show Files") {
+        // -----------------------------
+        // Stage 2: Run Container
+        // -----------------------------
+        stage('Run Container') {
             steps {
-                sh "ls -la"
+                sh '''
+                echo "Starting container..."
+                docker run -d --name $CONTAINER_NAME -v ${WORKSPACE}/tests:/tests $IMAGE_NAME
+                '''
             }
         }
 
-        stage("Create Python venv + Install Dependencies") {
+        // -----------------------------
+        // Stage 3: Wait for Service
+        // -----------------------------
+        stage('Wait for Service Readiness') {
             steps {
-                sh """
-                python3 --version
-                pip3 --version
+                sh '''
+                echo "Waiting for API to be ready..."
 
-                python3 -m venv venv
-                . venv/bin/activate
+                for i in {1..20}
+                do
+                    sleep 2
 
-                pip install --upgrade pip
-                pip install -r requirements.txt
-                """
+                    STATUS=$(docker exec $CONTAINER_NAME \
+                        curl -s -o /dev/null -w "%{http_code}" \
+                        http://localhost:$INTERNAL_PORT/health || true)
+
+                    if [ "$STATUS" = "200" ]; then
+                        echo "Service is ready!"
+                        exit 0
+                    fi
+                done
+
+                echo "Service did not start in time."
+                exit 1
+                '''
+            }
+        }
+        stage('Debug Container Files') {
+            steps {
+                sh '''
+                echo "Listing container root..."
+                docker exec $CONTAINER_NAME ls /
+
+                echo "Listing /tests directory..."
+                docker exec $CONTAINER_NAME ls /tests || true
+                '''
+            }
+        }
+        stage('Debug Workspace') {
+            steps {
+                sh '''
+                echo "Workspace path: $WORKSPACE"
+                ls -R $WORKSPACE
+                '''
+            }
+        }
+        // -----------------------------
+        // Stage 4: Valid Inference Test
+        stage('Send Valid Inference Request') {
+            steps {
+                sh '''
+                echo "Sending valid request..."
+
+                RESPONSE=$(cat tests/valid_input.json | docker exec -i $CONTAINER_NAME sh -c '
+                    curl -s -w "\\n%{http_code}" -X POST \
+                    http://localhost:8000/predict \
+                    -H "Content-Type: application/json" \
+                    -d @-
+                ')
+
+                BODY=$(echo "$RESPONSE" | head -n 1)
+                STATUS=$(echo "$RESPONSE" | tail -n 1)
+
+                echo "Status Code: $STATUS"
+                echo "Response Body: $BODY"
+
+                if [ "$STATUS" != "200" ]; then
+                    echo "Valid request failed!"
+                    exit 1
+                fi
+
+                echo "$BODY" | grep -q "prediction" || {
+                    echo "Prediction field missing!"
+                    exit 1
+                }
+
+                echo "Valid inference test passed."
+                '''
             }
         }
 
-        stage("Train + Evaluate Model") {
+        // -----------------------------
+        // Stage 5: Invalid Request Test
+        // -----------------------------
+        stage('Send Invalid Request') {
             steps {
-                sh """
-                . venv/bin/activate
+                sh '''
+                echo "Sending invalid request..."
 
-                echo "======================================"
-                echo "NAME   : ${NAME}"
-                echo "ROLLNO : ${ROLLNO}"
-                echo "======================================"
+                RESPONSE=$(cat tests/invalid_input.json | docker exec -i $CONTAINER_NAME sh -c '
+                    curl -s -w "\\n%{http_code}" -X POST \
+                    http://localhost:8000/predict \
+                    -H "Content-Type: application/json" \
+                    -d @-
+                ')
 
-                python3 train.py
-                """
+                BODY=$(echo "$RESPONSE" | head -n 1)
+                STATUS=$(echo "$RESPONSE" | tail -n 1)
+
+                echo "Status Code: $STATUS"
+                echo "Response Body: $BODY"
+
+                if [ "$STATUS" = "200" ]; then
+                    echo "Invalid request unexpectedly succeeded!"
+                    exit 1
+                fi
+
+                echo "Invalid request test passed."
+                '''
             }
         }
 
-        stage("Build Docker Image") {
+        // -----------------------------
+        // Stage 6: Stop Container
+        // -----------------------------
+        stage('Stop Container') {
             steps {
-                sh """
-                docker --version
-                docker build -t ${IMAGE}:latest .
-                docker images | head -20
-                """
+                sh '''
+                echo "Stopping and removing container..."
+                docker stop $CONTAINER_NAME || true
+                docker rm $CONTAINER_NAME || true
+                '''
             }
         }
     }
 
+    // -----------------------------
+    // Stage 7: Final Result
+    // -----------------------------
     post {
         success {
-            echo "✅ Pipeline SUCCESS: Training + Docker Build completed"
+            echo "All validation tests passed. Pipeline SUCCESS. 2022BCS0075"
         }
         failure {
-            echo "❌ Pipeline FAILED: Check Console Output"
+            echo "Pipeline FAILED due to validation error. 2022BCS0076"
+        }
+        always {
+            sh '''
+            echo "Ensuring container cleanup..."
+            docker stop $CONTAINER_NAME || true
+            docker rm $CONTAINER_NAME || true
+            '''
         }
     }
 }
