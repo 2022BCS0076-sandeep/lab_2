@@ -1,6 +1,10 @@
 pipeline {
     agent any
 
+    options {
+        skipDefaultCheckout(true)
+    }
+
     environment {
         IMAGE_NAME = "scarxlynx/ml-model:latest"
         CONTAINER_NAME = "wine_test_container"
@@ -9,9 +13,6 @@ pipeline {
 
     stages {
 
-        // -----------------------------
-        // Stage 1: Pull Image
-        // -----------------------------
         stage('Pull Image') {
             steps {
                 sh '''
@@ -21,27 +22,27 @@ pipeline {
             }
         }
 
-        // -----------------------------
-        // Stage 2: Run Container
-        // -----------------------------
         stage('Run Container') {
             steps {
                 sh '''
                 echo "Starting container..."
-                docker run -d --name $CONTAINER_NAME -v ${WORKSPACE}/tests:/tests $IMAGE_NAME
+
+                docker rm -f $CONTAINER_NAME || true
+
+                docker run -d \
+                    --name $CONTAINER_NAME \
+                    -v ${WORKSPACE}/tests:/tests \
+                    $IMAGE_NAME
                 '''
             }
         }
 
-        // -----------------------------
-        // Stage 3: Wait for Service
-        // -----------------------------
         stage('Wait for Service Readiness') {
             steps {
                 sh '''
                 echo "Waiting for API to be ready..."
 
-                for i in {1..20}
+                for i in $(seq 1 20)
                 do
                     sleep 2
 
@@ -60,6 +61,7 @@ pipeline {
                 '''
             }
         }
+
         stage('Debug Container Files') {
             steps {
                 sh '''
@@ -71,6 +73,7 @@ pipeline {
                 '''
             }
         }
+
         stage('Debug Workspace') {
             steps {
                 sh '''
@@ -79,8 +82,7 @@ pipeline {
                 '''
             }
         }
-        // -----------------------------
-        // Stage 4: Valid Inference Test
+
         stage('Send Valid Inference Request') {
             steps {
                 sh '''
@@ -114,9 +116,6 @@ pipeline {
             }
         }
 
-        // -----------------------------
-        // Stage 5: Invalid Request Test
-        // -----------------------------
         stage('Send Invalid Request') {
             steps {
                 sh '''
@@ -145,9 +144,6 @@ pipeline {
             }
         }
 
-        // -----------------------------
-        // Stage 6: Stop Container
-        // -----------------------------
         stage('Stop Container') {
             steps {
                 sh '''
@@ -159,16 +155,16 @@ pipeline {
         }
     }
 
-    // -----------------------------
-    // Stage 7: Final Result
-    // -----------------------------
     post {
+
         success {
-            echo "All validation tests passed. Pipeline SUCCESS. 2022BCS0075"
+            echo "All validation tests passed. Pipeline SUCCESS. 2022BCS0076."
         }
+
         failure {
-            echo "Pipeline FAILED due to validation error. 2022BCS0076"
+            echo "Pipeline FAILED due to validation error. 2022BCS0076."
         }
+
         always {
             sh '''
             echo "Ensuring container cleanup..."
