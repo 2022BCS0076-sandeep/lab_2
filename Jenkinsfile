@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        IMAGE_NAME = "scarxlynx/ml-model:latest"
+        IMAGE_NAME = "sandeepkumar76/ml-model:latest"
         CONTAINER_NAME = "wine_test_container"
         INTERNAL_PORT = "8000"
     }
