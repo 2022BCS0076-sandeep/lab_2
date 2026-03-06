@@ -1,10 +1,6 @@
 pipeline {
     agent any
 
-    options {
-        skipDefaultCheckout(true)
-    }
-
     environment {
         IMAGE_NAME = "scarxlynx/ml-model:latest"
         CONTAINER_NAME = "wine_test_container"
